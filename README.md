@@ -24,14 +24,16 @@
 
 ## 📊 Performance
 
-| Quantization Bits | PSNR ↑ | SAD ↓ | FPS ↑ | Memory Reduction |
-|-------------------|--------|-------|-------|------------------|
-| FP32 (Baseline)   | 38.2   | 12.4  | 15.2  | 1.0×             |
-| **8-bit**         | 37.8   | 13.1  | 28.5  | 4.2×             |
-| **4-bit**         | 36.9   | 15.8  | 52.3  | 7.8×             |
-| **2-bit**         | 34.1   | 22.7  | 89.6  | 12.4×            |
+PTQ4VM achieves **state-of-the-art performance** across 2-8 bit quantization ranges on video matting benchmarks:
 
-*Results on Robust Video Matting (RVM) with VideoMatte240K dataset*
+| Method | Bit | MAD↓ | MSE↓ | Grad↓ | Conn↓ | DTSSD↓ |
+|--------|-----|------|------|-------|-------|--------|
+| RVM (FP32) | W32A32 | 6.08 | 1.47 | 0.88 | 0.41 | 1.36 |
+| PTQ4VM | W8A8 | 6.03 | 1.29 | 0.95 | 0.41 | 1.46 |
+| PTQ4VM | W4A8 | 10.77 | 4.54 | 3.49 | 1.15 | 2.51 |
+| PTQ4VM | W4A4 | 20.33 | 13.80 | 7.48 | 2.57 | 4.63 |
+
+*Results on Robust Video Matting (RVM) with VideoMatte240K dataset. Lower is better for all metrics.*
 
 ## 🚀 Quick Start
 
@@ -106,20 +108,13 @@ PTQ4VM/
 If you use PTQ4VM in your research, please cite our paper:
 
 ```bibtex
-@inproceedings{yourname2025ptq4vm,
-  title={PTQ4VM: Post-Training Quantization for Video Matting},
-  author={Your Name and Co-authors},
-  booktitle={International Conference on Learning Representations (ICLR)},
-  year={2026},
-  url={https://arxiv.org/abs/2506.10840}
+@article{zhu2025post,
+  title={Post-Training Quantization for Video Matting},
+  author={Zhu, Tianrui and Chen, Houyuan and Gong, Ruihao and Magno, Michele and Qin, Haotong and Zhang, Kai},
+  journal={arXiv preprint arXiv:2506.10840},
+  year={2025}
 }
 ```
-
-## 🏆 Acknowledgments
-
-- Built upon the **QDrop** quantization framework
-- Inspired by **Robust Video Matting (RVM)** architecture  
-- Thanks to the original QDrop authors for their foundational work
 
 ---
 
