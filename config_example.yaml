@@ -1,0 +1,31 @@
+# Example configuration for PTQ4VM
+model:
+  type: "rvm"
+  checkpoint: "path/to/your/pretrained/rvm_model.pth"
+
+data:
+  videomatte_dir_train: "path/to/videomatte/train"
+  background_video_dir_train: "path/to/background/videos/train"
+  size: 512
+  seq_length: 40
+  batch_size: 8
+  num_workers: 4
+
+quant:
+  w_qconfig:
+    bit: 4
+    symmetric: true
+    ch_axis: -1
+  a_qconfig:
+    bit: 4
+    symmetric: true
+    ch_axis: -1
+  calibrate: 512
+  recon:
+    max_iter: 1000
+    lr: 0.001
+    weight_decay: 0.0
+
+process:
+  seed: 1029
+  gpu_id: 0
