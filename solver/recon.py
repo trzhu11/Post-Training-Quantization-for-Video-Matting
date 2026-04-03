@@ -2,13 +2,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import logging
-from imagenet_utils import DataSaverHook, StopForwardException
-from qdrop.quantization.quantized_module import QuantizedModule
-from qdrop.quantization.fake_quant import LSQFakeQuantize, LSQPlusFakeQuantize, QuantizeBase
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from solver.videomatte_utils import DataSaverHook, StopForwardException
+from quantization.quantized_module import QuantizedModule
+from quantization.fake_quant import LSQFakeQuantize, LSQPlusFakeQuantize, QuantizeBase
 from torch.nn import Module
 from typing import List, Optional, Tuple, Union, Callable
 from torch import Tensor
-logger = logging.getLogger('qdrop')
+logger = logging.getLogger('ptq4vm')
 
 
 def save_inp_oup_data(model: Module, module: Module, cali_data: Tensor,

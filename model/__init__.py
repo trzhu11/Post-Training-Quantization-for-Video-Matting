@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from qdrop.quantization.quantized_module import QuantizedLayer, QuantizedBlock, Quantizer   # noqa: F401
+from quantization.quantized_module import QuantizedLayer, QuantizedBlock, Quantizer   # noqa: F401
 from typing import Optional
 from torch import Tensor
 from .mobilenetv3 import InvertedResidual

@@ -1,22 +1,26 @@
 import numpy as np  # noqa: F401
 import copy
 import time
+import datetime
+import os
+import yaml
 import torch
 import torch.nn as nn
 import logging
 import argparse
-import videomatte_utils
-from qdrop.solver.recon import reconstruction
-from qdrop.solver.fold_bn import search_fold_and_remove_bn, StraightThrough
-from qdrop.model import load_model, specials
-from qdrop.quantization.state import enable_calibration_woquantization, enable_quantization, disable_all
-from qdrop.quantization.quantized_module import QuantizedLayer, QuantizedBlock
-from qdrop.quantization.fake_quant import QuantizeBase
-from qdrop.quantization.observer import ObserverBase
-import datetime # 新增导入
-import os # 新增导入
-import yaml # 新增导入 (需要 pip install pyyaml)
-logger = logging.getLogger('qdrop')
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from solver.videomatte_utils import parse_config, load_data, set_seed
+from solver.recon import reconstruction
+from solver.fold_bn import search_fold_and_remove_bn, StraightThrough
+from model import load_model, specials
+from quantization.state import enable_calibration_woquantization, enable_quantization, disable_all
+from quantization.quantized_module import QuantizedLayer, QuantizedBlock
+from quantization.fake_quant import QuantizeBase
+from quantization.observer import ObserverBase
+
+logger = logging.getLogger('ptq4vm')
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 
@@ -76,13 +80,12 @@ def get_cali_data(train_loader, num_samples):
 
 
 def main(config_path):
-    config = videomatte_utils.parse_config(config_path)
+    config = parse_config(config_path)
     gpu_id_to_use = config.gpu_id
     device = torch.device(f'cuda:{gpu_id_to_use}')
     torch.cuda.set_device(device)
-    videomatte_utils.set_seed(config.process.seed)
-    'cali data'
-    train_loader = videomatte_utils.load_data(**config.data)
+    set_seed(config.process.seed)
+    train_loader = load_data(**config.data)
     cali_fgr, cali_pha, cali_bgr = get_cali_data(train_loader, config.quant.calibrate)
     cali_data = cali_fgr * cali_pha + cali_bgr * (1 - cali_pha)
     'model'
@@ -131,7 +134,7 @@ def main(config_path):
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-        save_dir = "/home/test/pytorch_ztr/QDrop/qdrop/saved_models/granularity/block/4-4"
+        save_dir = os.path.join(os.path.dirname(__file__), '..', 'saved_models')
         base_filename = f"quantized_rvm_model_{timestamp}"
 
         os.makedirs(save_dir, exist_ok=True)

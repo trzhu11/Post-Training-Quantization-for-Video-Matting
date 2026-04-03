@@ -6,12 +6,12 @@ from easydict import EasyDict
 import random
 import torch
 import torchvision.transforms as transforms
-from qdrop.solver.videomatte import VideoMatteDataset
-from qdrop.solver.videomatte import VideoMatteTrainAugmentation, VideoMatteValidAugmentation
+from solver.videomatte import VideoMatteDataset
+from solver.videomatte import VideoMatteTrainAugmentation, VideoMatteValidAugmentation
 from torch.utils.data import DataLoader
-from qdrop.solver.augmentation import TrainFrameSampler, ValidFrameSampler
+from solver.augmentation import TrainFrameSampler, ValidFrameSampler
 import numpy as np
-logger = logging.getLogger('qdrop')
+logger = logging.getLogger('ptq4vm')
 
 
 def parse_config(config_file):

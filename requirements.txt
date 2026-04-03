@@ -7,3 +7,5 @@ PyYAML>=5.4.0
 easydict>=1.9
 tqdm>=4.60.0
 xlsxwriter>=3.0.0
+av>=8.0.0
+pims>=0.5

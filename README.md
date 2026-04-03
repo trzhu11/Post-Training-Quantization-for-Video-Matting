@@ -40,68 +40,101 @@ PTQ4VM achieves **state-of-the-art performance** across 2-8 bit quantization ran
 ### Installation
 
 ```bash
-git clone https://github.com/trzhu11/PTQ4VM.git
-cd PTQ4VM
+git clone https://github.com/trzhu11/Post-Training-Quantization-for-Video-Matting.git
+cd Post-Training-Quantization-for-Video-Matting
 pip install -r requirements.txt
 ```
 
-### Basic Usage
+### Data Preparation
 
-```python
-from PTQ4VM.solver.main_ptq4vm import main
-from PTQ4VM.solver.training_utils import create_quantization_config
+1. Download [VideoMatte240K](https://grail.cs.washington.edu/projects/background-matting-v2/#/datasets) dataset
+2. Download background videos from [DVM](https://github.com/nowsyn/DVM) or use your own
+3. Download the pretrained [RVM MobileNetV3](https://github.com/PeterL1n/RobustVideoMatting/releases) checkpoint
 
-# Create quantization configs
-w_config = create_quantization_config(bit_width=4)
-a_config = create_quantization_config(bit_width=4)
-
-# Run quantization
-main(args)
+Organize the data as:
+```
+data/
+├── VideoMatte240K_JPEG_SD/
+│   └── train/
+│       ├── fgr/
+│       └── pha/
+├── Backgrounds/
+│   └── train/
+├── videomatte_512x288/          # For evaluation
+│   ├── videomatte_motion/
+│   │   └── <clip_id>/
+│   │       └── com/             # Composite input frames
+│   └── videomatte_static/
+│       └── ...
+pretrained/
+└── rvm_mobilenetv3.pth
 ```
 
-### Command Line
+### Step 1: Quantization
 
 ```bash
-cd PTQ4VM
-python solver/main_ptq4vm.py \
-    --model_config configs/rvm.yaml \
-    --videomatte_dir_train /path/to/videomatte/train \
-    --background_video_dir_train /path/to/backgrounds/train \
-    --w_bit 4 --a_bit 4 \
-    --finetune --epochs 10
+# W8A8 quantization
+python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w8a8.yaml
+
+# W4A8 quantization
+python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w4a8.yaml
+
+# W4A4 quantization
+python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w4a4.yaml
 ```
+
+The quantized model will be saved under `saved_models/`.
+
+### Step 2: Inference
+
+```bash
+# Run inference on VideoMatte240K test set
+python inference.py \
+    --checkpoint saved_models/quantized_rvm_model.pth \
+    --input-root data/videomatte_512x288 \
+    --output-root results/w4a8 \
+    --device cuda:0
+
+# Run inference on a single video
+python inference.py \
+    --checkpoint saved_models/quantized_rvm_model.pth \
+    --input-source input.mp4 \
+    --output-alpha alpha.mp4 \
+    --output-foreground foreground.mp4 \
+    --output-type video \
+    --device cuda:0
+```
+
+### Step 3: Evaluation
+
+```bash
+python evaluate.py \
+    --pred-dir results/w4a8 \
+    --true-dir data/videomatte_512x288
+```
+
+This outputs an Excel sheet with per-clip metrics (MAD, MSE, Grad, Conn, DTSSD) and prints average scores.
 
 ## 📁 Project Structure
 
 ```
-PTQ4VM/
-├── quantization/          # 🧮 Core quantization engine
-├── model/               # 🏗️  Model architectures
-├── solver/              # 🔧 Training & inference scripts
-│   ├── main_ptq4vm.py      # Main quantization pipeline
-│   ├── training_utils.py   # Training utilities & losses
-│   ├── evaluation_utils.py # Evaluation & profiling
-│   └── videomatte_utils.py # Data loading utilities
-├── configs/             # 📋 Configuration templates
-└── examples/            # 📚 Usage examples
+Post-Training-Quantization-for-Video-Matting/
+├── configs/               # YAML configs for different bit-widths
+│   ├── rvm_mobilenetv3_w8a8.yaml
+│   ├── rvm_mobilenetv3_w4a8.yaml
+│   └── rvm_mobilenetv3_w4a4.yaml
+├── model/                 # RVM model architecture & quantized blocks
+├── quantization/          # Core quantization engine
+├── solver/                # Quantization pipeline & data loading
+│   ├── main_videomatte.py     # Main quantization entry point
+│   ├── recon.py               # Block reconstruction (QDrop)
+│   ├── videomatte.py          # Dataset definition
+│   └── videomatte_utils.py    # Config parsing & data loading
+├── inference.py           # Inference on video/image sequences
+├── inference_utils.py     # Video/image I/O utilities
+├── evaluate.py            # Evaluation metrics (MAD/MSE/Grad/Conn/DTSSD)
+└── requirements.txt
 ```
-
-## 🎯 Key Features
-
-### 🎬 Video-Aware Quantization
-- **Temporal Consistency Preservation**: Specialized loss functions for video sequences
-- **Flow-Guided Optimization**: Optional optical flow guidance for better temporal coherence
-- **Sequence-Wise Processing**: Efficient handling of video sequences
-
-### ⚡ Ultra-Efficient
-- **Post-Training**: No full retraining required
-- **Minutes-Level**: Complete quantization in minutes
-- **Memory-Efficient**: Low memory footprint during quantization
-
-### 🎛️ Flexible Configuration
-- **Bit-Width Flexibility**: Support for 2-bit to 8-bit quantization
-- **Model Agnostic**: Compatible with various video matting architectures
-- **Easy Integration**: Minimal code changes for existing models
 
 ## 📚 Citation
 
@@ -120,10 +153,10 @@ If you use PTQ4VM in your research, please cite our paper:
 
 <div align="center">
 
-**🌟 [Star our repository](https://github.com/trzhu11/PTQ4VM) if you find this work useful!**
+**🌟 [Star our repository](https://github.com/trzhu11/Post-Training-Quantization-for-Video-Matting) if you find this work useful!**
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2506.10840)
-[![Code](https://img.shields.io/badge/Code-Github-black)](https://github.com/trzhu11/PTQ4VM)
+[![Code](https://img.shields.io/badge/Code-Github-black)](https://github.com/trzhu11/Post-Training-Quantization-for-Video-Matting)
 [![ICLR](https://img.shields.io/badge/ICLR-2026-blue)](https://openreview.net/group?id=ICLR.cc/2026/Conference)
 
 </div>
