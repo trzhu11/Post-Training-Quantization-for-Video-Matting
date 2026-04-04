@@ -10,34 +10,18 @@
 
 **Post-Training Quantization for High-Fidelity Video Matting**
 
-> *Efficiently quantize video matting models without compromising temporal consistency or visual quality*
-
 </div>
 
-## 🌟 Highlights
+## Overview
 
-- 🚀 **Ultra-Fast Quantization**: Post-training quantization in minutes, not hours
-- 🎬 **Video-Specific Design**: Tailored for video matting with temporal consistency preservation
-- 🎯 **ICLR 2026 Accepted**: Presented at the International Conference on Learning Representations 2026
-- 📊 **State-of-the-Art Performance**: Minimal quality loss even at 4-bit quantization
-- 🔧 **Easy Integration**: Plug-and-play quantization for existing video matting models
+PTQ4VM is a two-stage post-training quantization pipeline for video matting models:
 
-## 📊 Performance
+- **Stage 1** — QDrop block-wise quantization with AdaRound and learnable activation scales
+- **Stage 2** — BN affine fine-tuning with OFA optical flow temporal consistency loss
 
-PTQ4VM achieves **state-of-the-art performance** across 2-8 bit quantization ranges on video matting benchmarks:
+It supports W8A8, W4A8, and W4A4 configurations on Robust Video Matting (RVM) MobileNetV3.
 
-| Method | Bit | MAD↓ | MSE↓ | Grad↓ | Conn↓ | DTSSD↓ |
-|--------|-----|------|------|-------|-------|--------|
-| RVM (FP32) | W32A32 | 6.08 | 1.47 | 0.88 | 0.41 | 1.36 |
-| PTQ4VM | W8A8 | 6.03 | 1.29 | 0.95 | 0.41 | 1.46 |
-| PTQ4VM | W4A8 | 10.77 | 4.54 | 3.49 | 1.15 | 2.51 |
-| PTQ4VM | W4A4 | 20.33 | 13.80 | 7.48 | 2.57 | 4.63 |
-
-*Results on Robust Video Matting (RVM) with VideoMatte240K dataset. Lower is better for all metrics.*
-
-## 🚀 Quick Start
-
-### Installation
+## Installation
 
 ```bash
 git clone https://github.com/trzhu11/Post-Training-Quantization-for-Video-Matting.git
@@ -45,13 +29,18 @@ cd Post-Training-Quantization-for-Video-Matting
 pip install -r requirements.txt
 ```
 
-### Data Preparation
+**Optional** (for Stage 2 optical flow loss): clone [RAFT](https://github.com/princeton-vl/RAFT) and set:
+```bash
+export RAFT_PATH=/path/to/RAFT
+```
 
-1. Download [VideoMatte240K](https://grail.cs.washington.edu/projects/background-matting-v2/#/datasets) dataset
+## Data Preparation
+
+1. Download [VideoMatte240K](https://grail.cs.washington.edu/projects/background-matting-v2/#/datasets) (JPEG_SD)
 2. Download background videos from [DVM](https://github.com/nowsyn/DVM) or use your own
 3. Download the pretrained [RVM MobileNetV3](https://github.com/PeterL1n/RobustVideoMatting/releases) checkpoint
+4. Prepare the low-resolution evaluation set (512x288 composites with ground-truth alpha)
 
-Organize the data as:
 ```
 data/
 ├── VideoMatte240K_JPEG_SD/
@@ -60,85 +49,116 @@ data/
 │       └── pha/
 ├── Backgrounds/
 │   └── train/
-├── videomatte_512x288/          # For evaluation
-│   ├── videomatte_motion/
-│   │   └── <clip_id>/
-│   │       └── com/             # Composite input frames
-│   └── videomatte_static/
-│       └── ...
+└── evaluation/
+    └── videomatte_512x288/
+        ├── videomatte_motion/
+        │   └── <clip_id>/
+        │       ├── com/    # composite input
+        │       ├── pha/    # ground-truth alpha
+        │       └── fgr/    # ground-truth foreground
+        └── videomatte_static/
+            └── ...
 pretrained/
-└── rvm_mobilenetv3.pth
+├── rvm_mobilenetv3.pth
+└── raft-sintel.pth          # optional, for Stage 2
 ```
 
-### Step 1: Quantization
+## Usage
+
+### Stage 1: QDrop Quantization
+
+Quantizes the FP32 model using block-wise reconstruction with QDrop.
 
 ```bash
-# W8A8 quantization
-python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w8a8.yaml
+# W4A4
+python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w4a4.yaml
 
-# W4A8 quantization
+# W4A8
 python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w4a8.yaml
 
-# W4A4 quantization
-python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w4a4.yaml
+# W8A8
+python solver/main_videomatte.py --config configs/rvm_mobilenetv3_w8a8.yaml
 ```
 
-The quantized model will be saved under `saved_models/`.
+Output: `saved_models/quantized_rvm_model_<timestamp>.pth`
 
-### Step 2: Inference
+### Stage 2: BN + Flow Fine-tuning (recommended for W4A4)
+
+Fine-tunes BN affine parameters and activation scales with combined alpha MSE + optical flow loss.
 
 ```bash
-# Run inference on VideoMatte240K test set
+# Update quantized_model_path in the config to point to Stage 1 output, then:
+python solver/main_bn_flow.py --config configs/stage2_bn_flow_w4a4.yaml --gpu_id 0
+```
+
+Output: `saved_models/stage2_w4a4_flow_<timestamp>.pth`
+
+### Inference
+
+```bash
+# On evaluation dataset
 python inference.py \
-    --checkpoint saved_models/quantized_rvm_model.pth \
-    --input-root data/videomatte_512x288 \
-    --output-root results/w4a8 \
+    --checkpoint saved_models/stage2_w4a4_flow_<timestamp>.pth \
+    --input-root data/evaluation/videomatte_512x288 \
+    --output-root results/w4a4 \
     --device cuda:0
 
-# Run inference on a single video
+# On a single video
 python inference.py \
-    --checkpoint saved_models/quantized_rvm_model.pth \
+    --checkpoint saved_models/stage2_w4a4_flow_<timestamp>.pth \
     --input-source input.mp4 \
-    --output-alpha alpha.mp4 \
-    --output-foreground foreground.mp4 \
+    --output-alpha output_alpha.mp4 \
+    --output-foreground output_fgr.mp4 \
     --output-type video \
+    --device cuda:0
+
+# On an image sequence directory
+python inference.py \
+    --checkpoint saved_models/stage2_w4a4_flow_<timestamp>.pth \
+    --input-source path/to/frames/ \
+    --output-alpha results/alpha/ \
+    --output-type png_sequence \
     --device cuda:0
 ```
 
-### Step 3: Evaluation
+### Evaluation
 
 ```bash
 python evaluate.py \
-    --pred-dir results/w4a8 \
-    --true-dir data/videomatte_512x288
+    --pred-dir results/w4a4 \
+    --true-dir data/evaluation/videomatte_512x288 \
+    --metrics pha_mad pha_mse pha_grad pha_conn pha_dtssd
 ```
 
-This outputs an Excel sheet with per-clip metrics (MAD, MSE, Grad, Conn, DTSSD) and prints average scores.
+Prints average metrics and saves per-clip results to an Excel file.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-Post-Training-Quantization-for-Video-Matting/
-├── configs/               # YAML configs for different bit-widths
-│   ├── rvm_mobilenetv3_w8a8.yaml
-│   ├── rvm_mobilenetv3_w4a8.yaml
-│   └── rvm_mobilenetv3_w4a4.yaml
-├── model/                 # RVM model architecture & quantized blocks
-├── quantization/          # Core quantization engine
-├── solver/                # Quantization pipeline & data loading
-│   ├── main_videomatte.py     # Main quantization entry point
-│   ├── recon.py               # Block reconstruction (QDrop)
-│   ├── videomatte.py          # Dataset definition
-│   └── videomatte_utils.py    # Config parsing & data loading
-├── inference.py           # Inference on video/image sequences
-├── inference_utils.py     # Video/image I/O utilities
-├── evaluate.py            # Evaluation metrics (MAD/MSE/Grad/Conn/DTSSD)
-└── requirements.txt
+PTQ4VM/
+├── configs/
+│   ├── rvm_mobilenetv3_w4a4.yaml     # Stage 1 W4A4 config
+│   ├── rvm_mobilenetv3_w4a8.yaml     # Stage 1 W4A8 config
+│   ├── rvm_mobilenetv3_w8a8.yaml     # Stage 1 W8A8 config
+│   └── stage2_bn_flow_w4a4.yaml      # Stage 2 config
+├── model/                             # RVM architecture + quantized blocks
+├── quantization/                      # Quantizers, observers, fake-quant
+├── solver/
+│   ├── main_videomatte.py            # Stage 1: QDrop quantization
+│   ├── main_bn_flow.py               # Stage 2: BN + Flow fine-tuning
+│   ├── recon.py                      # Block-wise reconstruction
+│   ├── fold_bn.py                    # BN folding
+│   ├── videomatte.py                 # VideoMatte dataset
+│   ├── videomatte_utils.py           # Config parsing & data loading
+│   └── augmentation.py               # Data augmentation
+├── inference.py                       # Inference (video / image sequence)
+├── inference_utils.py                 # Video/image I/O
+├── evaluate.py                        # Metric computation
+├── requirements.txt
+└── README.md
 ```
 
-## 📚 Citation
-
-If you use PTQ4VM in your research, please cite our paper:
+## Citation
 
 ```bibtex
 @article{zhu2025post,
@@ -149,14 +169,6 @@ If you use PTQ4VM in your research, please cite our paper:
 }
 ```
 
----
+## License
 
-<div align="center">
-
-**🌟 [Star our repository](https://github.com/trzhu11/Post-Training-Quantization-for-Video-Matting) if you find this work useful!**
-
-[![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2506.10840)
-[![Code](https://img.shields.io/badge/Code-Github-black)](https://github.com/trzhu11/Post-Training-Quantization-for-Video-Matting)
-[![ICLR](https://img.shields.io/badge/ICLR-2026-blue)](https://openreview.net/group?id=ICLR.cc/2026/Conference)
-
-</div>
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

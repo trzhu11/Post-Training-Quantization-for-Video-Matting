@@ -17,27 +17,29 @@ data:
 
 quant:
   w_qconfig:
-    quantizer: FixedFakeQuantize
+    quantizer: AdaRoundFakeQuantize
     observer: MinMaxObserver
     bit: 4
     symmetric: true
-    ch_axis: -1
+    ch_axis: 0
   a_qconfig:
-    quantizer: FixedFakeQuantize
+    quantizer: LSQFakeQuantize
     observer: AvgMinMaxObserver
     bit: 8
     symmetric: true
     ch_axis: -1
   calibrate: 128
   recon:
-    scale: 1.0e-5
-    opt_mode: mse
     iters: 20000
     b_range: [20, 2]
-    warmup: 0.0
+    warm_up: 0.0
     p: 2.0
     batch_size: 32
     drop_prob: 0.5
+    round_mode: learned_hard_sigmoid
+    weight: 0.01
+    keep_gpu: true
+    scale_lr: 4.0e-5
 
 process:
   seed: 1029

@@ -1,0 +1,48 @@
+# Stage 2: BN Affine Fine-tuning + OFA Optical Flow Loss
+# Input: Stage 1 quantized model (.pth)
+
+# Path to Stage 1 output model (update after Stage 1 completes)
+quantized_model_path: saved_models/stage1_w4a4.pth
+
+# Where to save Stage 2 output
+save_dir: saved_models/
+
+# RAFT optical flow model (set RAFT_PATH env var to RAFT repo root)
+flow_model_path: pretrained/raft-sintel.pth
+
+# Data (same paths as Stage 1)
+videomatte_dir_train: data/VideoMatte240K_JPEG_SD/train
+background_video_dir_train: data/Backgrounds/train
+resolution: 512
+seq_length: 4
+num_cali_sequences: 64
+
+# Training hyperparameters
+epochs: 55
+batch_size: 4
+lr: 1.0e-4
+flow_lambda: 0.05
+task_mse_lambda: 1.0
+
+# Quantization bit info (for naming)
+w_bit: 4
+a_bit: 4
+
+# Evaluation
+eval_input_root: data/evaluation/videomatte_512x288
+eval_input_resize: [288, 512]
+run_evaluation: true
+
+# Device
+gpu_id: 0
+
+# General
+seed: 42
+log_freq: 50
+workers: 4
+
+# RAFT settings
+raft_small: false
+raft_mixed_precision: false
+raft_iters: 12
+disable_flow: false

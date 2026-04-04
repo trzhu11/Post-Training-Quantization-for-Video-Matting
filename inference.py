@@ -97,26 +97,27 @@ def convert_video(model,
         with torch.no_grad():
             bar = tqdm(total=len(source), disable=not progress, dynamic_ncols=True)
             rec = [None] * 4
-            for src in reader:
-                if downsample_ratio is None:
-                    downsample_ratio = auto_downsample_ratio(*src.shape[2:])
+            for src_batch in reader:
+                src_batch = src_batch.to(device, dtype, non_blocking=True)
+                for i in range(src_batch.shape[0]):
+                    frame = src_batch[i:i+1]
+                    h, w = frame.shape[2:]
+                    dr = downsample_ratio if downsample_ratio is not None else auto_downsample_ratio(h, w)
+                    fgr, pha, *rec = model(frame, *rec, downsample_ratio=dr)
 
-                src = src.to(device, dtype, non_blocking=True).unsqueeze(0)
-                fgr, pha, *rec = model(src, *rec, downsample_ratio)
+                    if output_foreground is not None:
+                        writer_fgr.write(fgr[0].cpu())
+                    if output_alpha is not None:
+                        writer_pha.write(pha[0].cpu())
+                    if output_composition is not None:
+                        if output_type == 'video':
+                            com = fgr * pha + bgr * (1 - pha)
+                        else:
+                            fgr_out = fgr * pha.gt(0)
+                            com = torch.cat([fgr_out, pha], dim=-3)
+                        writer_com.write(com[0].cpu())
 
-                if output_foreground is not None:
-                    writer_fgr.write(fgr[0])
-                if output_alpha is not None:
-                    writer_pha.write(pha[0])
-                if output_composition is not None:
-                    if output_type == 'video':
-                        com = fgr * pha + bgr * (1 - pha)
-                    else:
-                        fgr_out = fgr * pha.gt(0)
-                        com = torch.cat([fgr_out, pha], dim=-3)
-                    writer_com.write(com[0])
-
-                bar.update(src.size(1))
+                    bar.update(1)
     finally:
         if output_composition is not None:
             writer_com.close()
